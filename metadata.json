@@ -1,0 +1,8 @@
+{
+  "name": "Remix PLAY ARENA",
+  "description": "PLAY BEYOND THE LIMITS — Next-generation premier gaming platform and competitive esports arena.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
