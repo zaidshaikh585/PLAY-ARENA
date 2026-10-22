@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Shield, Lock, User, Mail, ArrowRight, LoaderCircle, KeyRound, CheckCircle2, AlertCircle, RotateCw } from 'lucide-react';
 import { soundFx } from '../utils/soundEffects';
-import { supabase, supabaseConfigured } from '../lib/supabase';
+import { supabase, supabaseConfigured, getAuthRedirectUrl } from '../lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -11,8 +11,8 @@ interface AuthModalProps {
   initialErrorMessage?: string;
 }
 
-/** Maximum time (ms) an auth request can take before timing out (30 seconds safeguard for slow network/email dispatch) */
-const AUTH_TIMEOUT_MS = 30_000;
+/** Maximum time (ms) an auth request can take before timing out (45 seconds safeguard for slow network/email dispatch) */
+const AUTH_TIMEOUT_MS = 45_000;
 
 /**
  * Diagnostic logger: Logs operation names, elapsed times, HTTP status, and safe error codes.
@@ -243,7 +243,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           type: 'signup',
           email: pendingConfirmEmail,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: getAuthRedirectUrl('/'),
           },
         }),
         AUTH_TIMEOUT_MS,
@@ -329,7 +329,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             password,
             options: {
               data: { gamer_tag: cleanTag },
-              emailRedirectTo: `${window.location.origin}/`,
+              emailRedirectTo: getAuthRedirectUrl('/'),
             },
           }),
           AUTH_TIMEOUT_MS,
@@ -410,17 +410,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const t0 = performance.now();
         logAuthDiagnostic('START', opName, { emailDomain: trimmedEmail.split('@')[1] });
 
-        // 2. Invoke Supabase Auth signInWithPassword
-        const { data, error } = await callWithTimeout(
-          supabase.auth.signInWithPassword({
-            email: trimmedEmail,
-            password,
-          }),
-          AUTH_TIMEOUT_MS,
-          'Sign in timed out while connecting to the authentication server. Please check your internet connection.'
-        );
+        // Do not call getSession() before password authentication. Session reads can
+        // wait on the Supabase auth storage lock in some browser profiles; a preflight
+        // read is unnecessary and can prevent the actual password request from starting.
+        // signInWithPassword is the source of truth for credential validation.
+        console.log('[PlayArena Auth] Starting password authentication request.');
+
+        // Invoke Supabase Auth signInWithPassword with a bounded wait.
+        let authResult: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
+        try {
+          authResult = await callWithTimeout(
+            supabase.auth.signInWithPassword({
+              email: trimmedEmail,
+              password,
+            }),
+            AUTH_TIMEOUT_MS,
+            'Sign in timed out while connecting to the authentication server. Please check your internet connection.'
+          );
+        } catch (timeoutErr) {
+          // The server may have accepted the login even if the browser did not receive
+          // the response. Check for that outcome, but never let the recovery check hang
+          // longer than 3 seconds or hide the original sign-in failure.
+          let recoveredSession: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'] = null;
+          try {
+            const fallbackSessionCheck = await callWithTimeout(
+              supabase.auth.getSession(),
+              3000,
+              'Post-login session verification timed out.'
+            );
+            recoveredSession = fallbackSessionCheck.data.session;
+          } catch (sessionCheckErr) {
+            console.warn('[PlayArena Auth] Bounded post-timeout session check failed:', {
+              originalError: timeoutErr instanceof Error ? timeoutErr.name : 'UnknownError',
+              sessionCheckError: sessionCheckErr instanceof Error ? sessionCheckErr.name : 'UnknownError',
+            });
+          }
+
+          if (recoveredSession?.user?.email?.toLowerCase() === trimmedEmail) {
+            console.log('[PlayArena Auth] Session verified after sign-in timeout; suppressing timeout error.');
+            authResult = {
+              data: { user: recoveredSession.user, session: recoveredSession },
+              error: null,
+            };
+          } else {
+            throw timeoutErr;
+          }
+        }
 
         const elapsedMs = Math.round(performance.now() - t0);
+        const { data, error } = authResult;
 
         if (error) {
           logAuthDiagnostic('ERROR', opName, {
@@ -452,50 +490,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         if (!data.user) throw new Error('Could not retrieve user credentials.');
 
-        // Query user profile for role verification (no passwords stored or selected)
-        let { data: profile } = await supabase
-          .from('profiles')
-          .select('role, gamer_tag')
-          .eq('id', data.user.id)
-          .maybeSingle();
+        let userRole = 'user' as 'user' | 'admin';
+        let tag = (data.user.user_metadata?.gamer_tag as string) || trimmedEmail.split('@')[0];
 
-        let userRole = (profile?.role as 'user' | 'admin') || 'user';
-        let tag = profile?.gamer_tag || trimmedEmail.split('@')[0];
-
-        // Self-heal profile row if missing so user does not get locked out
-        if (!profile) {
-          const { data: createdProfile } = await supabase
+        // 3. Admin authorization verification
+        if (role === 'admin') {
+          const { data: profile } = await supabase
             .from('profiles')
-            .upsert(
-              {
-                id: data.user.id,
-                email: trimmedEmail,
-                gamer_tag: tag,
-                role: 'user',
-              },
-              { onConflict: 'id' }
-            )
             .select('role, gamer_tag')
+            .eq('id', data.user.id)
             .maybeSingle();
-          if (createdProfile) {
-            userRole = (createdProfile.role as 'user' | 'admin') || 'user';
-            tag = createdProfile.gamer_tag || tag;
-          }
-        }
 
-        // Trusted database check for admin role via RPC function
-        if (role === 'admin' && userRole !== 'admin') {
-          const { data: isDbAdmin } = await supabase.rpc('is_playarena_admin');
-          if (isDbAdmin === true) {
+          if (profile?.role === 'admin') {
             userRole = 'admin';
+            tag = profile.gamer_tag || tag;
+          } else {
+            const { data: isDbAdmin } = await supabase.rpc('is_playarena_admin');
+            if (isDbAdmin === true) {
+              userRole = 'admin';
+              tag = profile?.gamer_tag || tag;
+            }
           }
-        }
 
-        if (role === 'admin' && userRole !== 'admin') {
-          await supabase.auth.signOut();
-          throw new Error(
-            'Access denied: This account does not have administrator privileges. Please log in through User Login or request admin elevation in the Supabase SQL Editor.'
-          );
+          if (userRole !== 'admin') {
+            await supabase.auth.signOut();
+            throw new Error(
+              'Access denied: This account does not have administrator privileges. Please log in through User Login or request admin elevation in the Supabase SQL Editor.'
+            );
+          }
+        } else {
+          // Standard gamer login: Non-blocking profile check with fast 2-second timeout
+          try {
+            const profilePromise = supabase
+              .from('profiles')
+              .select('role, gamer_tag')
+              .eq('id', data.user.id)
+              .maybeSingle();
+
+            const profileResult = await Promise.race([
+              profilePromise,
+              new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), 2000)),
+            ]);
+
+            if (profileResult?.data) {
+              userRole = (profileResult.data.role as 'user' | 'admin') || 'user';
+              tag = profileResult.data.gamer_tag || tag;
+            }
+          } catch {
+            // Profile read failure must not block valid authenticated user login
+          }
         }
 
         soundFx.playSuccess();
@@ -519,7 +562,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         // Standard Supabase URL matching requires clean base redirect path
         const { error } = await callWithTimeout(
           supabase.auth.resetPasswordForEmail(trimmedEmail, {
-            redirectTo: `${window.location.origin}/`,
+            redirectTo: getAuthRedirectUrl('/'),
           }),
           AUTH_TIMEOUT_MS,
           'Password reset request timed out. Please check your connection and try again.'

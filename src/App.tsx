@@ -109,39 +109,57 @@ export default function App() {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
-    // B) If user landed on a recovery or authorization URL, open modal in update-password mode immediately
+    // B) If user landed on an explicit password recovery URL, open modal in update-password mode immediately
     else if (
       initialAuthUrlInfo.isRecovery ||
       rawHash.includes('type=recovery') ||
       rawHash.includes('reset-password') ||
       searchParams.get('type') === 'recovery' ||
-      searchParams.get('code')
+      hashParams.get('type') === 'recovery'
     ) {
-      console.log('[PlayArena App] Detected recovery URL markers:', {
+      console.log('[PlayArena App] Detected password recovery URL markers:', {
         initialWasRecovery: initialAuthUrlInfo.isRecovery,
         hasTypeRecovery: rawHash.includes('type=recovery') || searchParams.get('type') === 'recovery',
-        hasCode: Boolean(searchParams.get('code')),
         hasResetHash: rawHash.includes('reset-password'),
       });
       setAuthModalError(null);
       setAuthModalMode('update-password');
       setIsAuthOpen(true);
+    }
+    // C) If user landed on an email verification / signup confirmation callback
+    else if (
+      initialAuthUrlInfo.isSignupVerification ||
+      rawHash.includes('type=signup') ||
+      rawHash.includes('type=email_change') ||
+      searchParams.get('type') === 'signup' ||
+      hashParams.get('type') === 'signup'
+    ) {
+      console.log('[PlayArena App] Detected email confirmation callback');
+      showToast('Email confirmation verified! Connecting neural link...');
+      setIsAuthOpen(false);
+    }
 
-      // PKCE fallback: If code is present and detectSessionInUrl did not catch it, exchange code
-      const code = searchParams.get('code');
-      if (code && client) {
-        void client.auth.getSession().then(({ data: { session } }) => {
-          if (!session) {
-            console.log('[PlayArena App] Invoking PKCE exchange fallback for code...');
-            client.auth.exchangeCodeForSession(code).then(({ data, error }) => {
-              console.log('[PlayArena App] PKCE exchange result:', {
-                hasSession: Boolean(data?.session),
-                hasError: Boolean(error),
-              });
-            }).catch(() => {});
+    // D) Handle PKCE code exchange if present (for either recovery or signup confirmation)
+    const code = searchParams.get('code');
+    if (code && client) {
+      void client.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          console.log('[PlayArena App] Invoking PKCE exchange fallback for code...');
+          client.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+            console.log('[PlayArena App] PKCE exchange result:', {
+              hasSession: Boolean(data?.session),
+              hasError: Boolean(error),
+            });
+            if (!error && typeof window !== 'undefined' && window.history?.replaceState) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }).catch(() => {});
+        } else {
+          if (typeof window !== 'undefined' && window.history?.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
           }
-        });
-      }
+        }
+      });
     }
 
 
@@ -184,50 +202,13 @@ export default function App() {
     };
     void fetchGames();
 
-    // 3. Fetch current active session immediately
-    const syncUserSession = async () => {
-      try {
-        const { data: { session } } = await client.auth.getSession();
-        if (!mounted) return;
-        if (session?.user) {
-          const { data: profile } = await client
-            .from('profiles')
-            .select('role, gamer_tag')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-          let userRole = (profile?.role as 'user' | 'admin') || 'user';
-          if (userRole !== 'admin') {
-            const { data: isDbAdmin } = await client.rpc('is_playarena_admin');
-            if (isDbAdmin === true) {
-              userRole = 'admin';
-            }
-          }
-
-          if (mounted) {
-            setCurrentUser({
-              email: session.user.email || '',
-              gamerTag: profile?.gamer_tag || session.user.email?.split('@')[0] || 'Gamer',
-              role: userRole,
-            });
-          }
-        } else {
-          setCurrentUser(null);
-        }
-      } catch (err) {
-        console.warn('Session sync warning:', err);
-        if (mounted) setCurrentUser(null);
-      }
-    };
-
-    void syncUserSession();
-
-    // 4. Listen to auth state transitions
-    const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
+    // 3. Listen to auth state transitions (automatically receives INITIAL_SESSION on mount)
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
       console.log('[PlayArena App] Auth event transition:', event, {
         hasSession: Boolean(session),
+        userEmail: session?.user?.email ? session.user.email.split('@')[1] : null,
       });
 
       if (event === 'PASSWORD_RECOVERY') {
@@ -238,29 +219,50 @@ export default function App() {
       }
 
       if (event === 'USER_UPDATED') {
-        // Password was changed successfully; modal handles the transition
+        // Password or user was updated
         return;
       }
 
-      if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT' || !session?.user) {
         setCurrentUser(null);
         return;
       }
 
-      if (session?.user) {
+      // Synchronously set user state from session metadata so UI updates with 0 latency
+      const metaTag = (session.user.user_metadata?.gamer_tag as string) || session.user.email?.split('@')[0] || 'Gamer';
+      if (mounted) {
+        setCurrentUser((prev) => {
+          if (prev && prev.email === session.user.email) {
+            return prev;
+          }
+          return {
+            email: session.user.email || '',
+            gamerTag: metaTag,
+            role: 'user',
+          };
+        });
+      }
+
+      // Non-blocking background sync of profile row and elevated admin role
+      // Does not return a pending promise to GoTrue, preventing signInWithPassword timeouts
+      void (async () => {
         try {
-          // On first login after email confirmation, ensure profile exists
+          if (!mounted) return;
+
           if (event === 'SIGNED_IN') {
-            const gamerTag = (session.user.user_metadata?.gamer_tag as string) || session.user.email?.split('@')[0] || 'Gamer';
             await client.from('profiles').upsert(
               {
                 id: session.user.id,
                 email: session.user.email || '',
-                gamer_tag: gamerTag,
+                gamer_tag: metaTag,
                 role: 'user',
               },
               { onConflict: 'id', ignoreDuplicates: true }
             );
+            if (initialAuthUrlInfo.isSignupVerification || rawHash.includes('type=signup') || searchParams.get('type') === 'signup') {
+              showToast(`Email verified! Neural link activated: Welcome ${metaTag}`);
+              setIsAuthOpen(false);
+            }
           }
 
           const { data: profile } = await client
@@ -280,21 +282,14 @@ export default function App() {
           if (mounted) {
             setCurrentUser({
               email: session.user.email || '',
-              gamerTag: profile?.gamer_tag || session.user.email?.split('@')[0] || 'Gamer',
+              gamerTag: profile?.gamer_tag || metaTag,
               role: userRole,
             });
           }
-        } catch {
-          // Profile query failed — still set user with defaults
-          if (mounted) {
-            setCurrentUser({
-              email: session.user.email || '',
-              gamerTag: session.user.email?.split('@')[0] || 'Gamer',
-              role: 'user',
-            });
-          }
+        } catch (err) {
+          console.warn('[PlayArena App] Background profile sync notice:', err);
         }
-      }
+      })();
     });
 
     return () => {

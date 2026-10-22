@@ -54,12 +54,55 @@ if (typeof window !== 'undefined' && window.location.hash) {
 }
 
 /**
+ * Resolves the absolute redirect URL for Supabase authentication callbacks
+ * (email verification, password recovery, magic link).
+ * 
+ * Works dynamically across environments:
+ * - On production Render (e.g. https://<app-name>.onrender.com)
+ * - On local development (e.g. http://localhost:3000)
+ * - Supports VITE_SITE_URL or VITE_APP_URL environment variable overrides if configured.
+ * - Guarantees no hardcoded localhost URLs are emitted when deployed.
+ */
+export function getAuthRedirectUrl(path: string = '/'): string {
+  let origin = '';
+
+  const envUrl = (
+    (import.meta.env.VITE_SITE_URL as string | undefined) ||
+    (import.meta.env.VITE_APP_URL as string | undefined)
+  )?.trim();
+
+  if (envUrl && /^https?:\/\//i.test(envUrl)) {
+    origin = envUrl.replace(/\/+$/, '');
+  } else if (typeof window !== 'undefined' && window.location?.origin) {
+    origin = window.location.origin.replace(/\/+$/, '');
+  }
+
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const fullUrl = origin ? `${origin}${cleanPath}` : cleanPath;
+
+  console.log('[PlayArena Auth] Generated auth redirect URL:', {
+    origin,
+    fullUrl,
+    environment: import.meta.env.MODE,
+  });
+
+  return fullUrl;
+}
+
+/**
  * Capture initial auth URL parameters immediately upon script evaluation,
  * before GoTrue's detectSessionInUrl strips them from window.location.
  */
 export const initialAuthUrlInfo = (function checkInitialUrl() {
   if (typeof window === 'undefined') {
-    return { isRecovery: false, error: null, errorCode: null, errorDescription: null };
+    return {
+      isRecovery: false,
+      isSignupVerification: false,
+      hasAuthCode: false,
+      error: null,
+      errorCode: null,
+      errorDescription: null,
+    };
   }
   const searchParams = new URLSearchParams(window.location.search);
   const rawHash = window.location.hash || '';
@@ -71,15 +114,28 @@ export const initialAuthUrlInfo = (function checkInitialUrl() {
   const rawErrorDesc = searchParams.get('error_description') || hashParams.get('error_description');
   const errorDescription = rawErrorDesc ? decodeURIComponent(rawErrorDesc).replace(/\+/g, ' ') : null;
 
-  const isRecovery = Boolean(
+  const isExplicitRecovery = Boolean(
     rawHash.includes('type=recovery') ||
     rawHash.includes('reset-password') ||
     searchParams.get('type') === 'recovery' ||
-    (searchParams.get('code') && !error)
+    hashParams.get('type') === 'recovery'
   );
 
+  const isSignupVerification = Boolean(
+    rawHash.includes('type=signup') ||
+    rawHash.includes('type=email_change') ||
+    searchParams.get('type') === 'signup' ||
+    searchParams.get('type') === 'email_change' ||
+    hashParams.get('type') === 'signup' ||
+    hashParams.get('type') === 'email_change'
+  );
+
+  const hasAuthCode = Boolean(searchParams.get('code') && !error);
+
   return {
-    isRecovery,
+    isRecovery: isExplicitRecovery,
+    isSignupVerification,
+    hasAuthCode,
     error,
     errorCode,
     errorDescription,
