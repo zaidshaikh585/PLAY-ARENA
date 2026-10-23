@@ -38,7 +38,12 @@ export default function App() {
   const [isAdminRoute, setIsAdminRoute] = useState(window.location.pathname.startsWith('/admin'));
 
   // Modal states
-  const [selectedGameForLaunch, setSelectedGameForLaunch] = useState<Game | null>(null);
+  const [selectedGameForLaunch, setSelectedGameForLaunch] = useState<Game | null>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/play')) {
+      return FEATURED_GAMES[0];
+    }
+    return null;
+  });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -317,6 +322,31 @@ export default function App() {
 
   const handlePlayGame = (game: Game) => {
     setSelectedGameForLaunch(game);
+    if (typeof window !== 'undefined' && window.history?.pushState) {
+      window.history.pushState({}, '', '/play');
+    }
+  };
+
+  const handleNavigateHomeFromLauncher = () => {
+    setSelectedGameForLaunch(null);
+    if (typeof window !== 'undefined') {
+      if (window.history?.pushState) {
+        window.history.pushState({}, '', '/');
+      }
+      const hero = document.querySelector('#home');
+      if (hero) {
+        hero.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const handleCloseLauncher = () => {
+    setSelectedGameForLaunch(null);
+    if (typeof window !== 'undefined' && window.history?.pushState && window.location.pathname.startsWith('/play')) {
+      window.history.pushState({}, '', '/');
+    }
   };
 
   const handleSelectGameById = (gameId: string) => {
@@ -379,11 +409,17 @@ export default function App() {
   // Listen for browser popstate (back / forward navigation)
   useEffect(() => {
     const handlePopState = () => {
-      setIsAdminRoute(window.location.pathname.startsWith('/admin'));
+      const path = window.location.pathname;
+      setIsAdminRoute(path.startsWith('/admin'));
+      if (path.startsWith('/play')) {
+        setSelectedGameForLaunch((prev) => prev || gamesList[0] || FEATURED_GAMES[0]);
+      } else if (!path.startsWith('/admin')) {
+        setSelectedGameForLaunch(null);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [gamesList]);
 
   const wishlistedGames = gamesList.filter((g) => wishlistIds.includes(g.id));
 
@@ -491,7 +527,8 @@ export default function App() {
       {/* Interactive Modals */}
       <GameLauncherModal
         game={selectedGameForLaunch}
-        onClose={() => setSelectedGameForLaunch(null)}
+        onClose={handleCloseLauncher}
+        onNavigateHome={handleNavigateHomeFromLauncher}
       />
 
       <SearchModal

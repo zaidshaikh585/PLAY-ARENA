@@ -593,7 +593,7 @@ export const Hero: React.FC<HeroProps> = ({
   imageUrl={activeGame.imageUrl}
   type={activeGame.svgArtwork}
   className="w-full h-full transition-transform duration-700 group-hover:scale-105"
-/> className="w-full h-full transition-transform duration-700 group-hover:scale-105" 
+/> 
                 
                 {/* Neon overlay vignette */}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#090D1A] via-transparent to-transparent opacity-90" />

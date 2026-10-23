@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Play, Star, Users, HardDrive, Wifi, ShieldCheck, Volume2, RotateCcw } from 'lucide-react';
+import { X, Play, Star, Users, HardDrive, Wifi, ShieldCheck, Volume2, RotateCcw, Home, ArrowLeft } from 'lucide-react';
 import { Game } from '../types/gaming';
 import { GameArtwork } from './GameArtwork';
 import { soundFx } from '../utils/soundEffects';
@@ -7,9 +7,10 @@ import { soundFx } from '../utils/soundEffects';
 interface GameLauncherModalProps {
   game: Game | null;
   onClose: () => void;
+  onNavigateHome?: () => void;
 }
 
-export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onClose }) => {
+export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onClose, onNavigateHome }) => {
   const [launchProgress, setLaunchProgress] = useState(0);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isLaunched, setIsLaunched] = useState(false);
@@ -21,6 +22,26 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
   }, [game]);
 
   if (!game) return null;
+
+  const handleGoHome = () => {
+    soundFx.playClick();
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else {
+      onClose();
+      if (typeof window !== 'undefined') {
+        if (window.history?.pushState) {
+          window.history.pushState({}, '', '/');
+        }
+        const hero = document.querySelector('#home');
+        if (hero) {
+          hero.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    }
+  };
 
   const handleLaunch = () => {
     soundFx.playClick();
@@ -48,13 +69,31 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-4xl rounded-2xl bg-[#080C1B] border border-cyan-400/50 shadow-[0_0_60px_rgba(0,240,255,0.25)] overflow-hidden">
-        {/* Header Bar */}
-        <div className="px-6 py-4 bg-[#050713] border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00F0FF]" />
-            <span className="font-gaming text-xs font-bold uppercase tracking-wider text-white">
-              PLAY ARENA LAUNCHER // {game.title}
-            </span>
+        {/* Header Bar with GO HOME button */}
+        <div className="px-4 sm:px-6 py-3.5 bg-[#050713] border-b border-white/10 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap min-w-0">
+            {/* GO HOME button */}
+            <button
+              type="button"
+              data-cursor="action"
+              onClick={handleGoHome}
+              onMouseEnter={() => soundFx.playHover()}
+              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-950/80 to-purple-950/80 hover:from-cyan-900/90 hover:to-purple-900/90 border border-cyan-400/50 hover:border-cyan-300 text-cyan-300 hover:text-white font-gaming text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(0,240,255,0.25)] hover:shadow-[0_0_25px_rgba(0,240,255,0.5)] transition-all duration-200 active:scale-95 shrink-0"
+              title="Return to main homepage"
+              aria-label="Go to homepage"
+            >
+              <Home className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+              <span>GO HOME</span>
+            </button>
+
+            <div className="h-4 w-px bg-white/15 hidden sm:block shrink-0" />
+
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00F0FF] shrink-0" />
+              <span className="font-gaming text-xs font-bold uppercase tracking-wider text-white truncate max-w-[170px] sm:max-w-xs md:max-w-md">
+                PLAY ARENA LAUNCHER // {game.title}
+              </span>
+            </div>
           </div>
 
           <button
@@ -63,7 +102,9 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
               soundFx.playClick();
               onClose();
             }}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+            title="Close launcher"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -114,10 +155,11 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
                   </button>
                   <button
                     type="button"
-                    onClick={onClose}
-                    className="px-5 py-2.5 rounded-xl bg-cyan-400 text-slate-950 font-gaming text-xs uppercase font-black"
+                    onClick={handleGoHome}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-gaming text-xs uppercase font-black flex items-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all"
                   >
-                    Close Launcher
+                    <Home className="w-3.5 h-3.5 fill-current" />
+                    GO HOME
                   </button>
                 </div>
               </div>
