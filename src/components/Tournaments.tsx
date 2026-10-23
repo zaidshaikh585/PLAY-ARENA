@@ -29,7 +29,7 @@ export const Tournaments: React.FC<TournamentsProps> = ({ onJoinTournament }) =>
             <div className="text-left md:text-right p-3 rounded-xl bg-[#090E20] border border-amber-500/30">
               <span className="text-[10px] font-mono text-slate-400 block uppercase">TOTAL COMBINED POOL</span>
               <span className="text-2xl sm:text-3xl font-black font-gaming text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-pink-500 font-tabular drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]">
-                $250,000 USD
+                ₹2,50,00,000 INR
               </span>
             </div>
           }

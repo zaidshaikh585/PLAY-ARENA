@@ -8,9 +8,10 @@ interface GameLauncherModalProps {
   game: Game | null;
   onClose: () => void;
   onNavigateHome?: () => void;
+  onBack?: () => void;
 }
 
-export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onClose, onNavigateHome }) => {
+export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onClose, onNavigateHome, onBack }) => {
   const [launchProgress, setLaunchProgress] = useState(0);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isLaunched, setIsLaunched] = useState(false);
@@ -43,6 +44,15 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
     }
   };
 
+  const handleBack = () => {
+    soundFx.playClick();
+    if (onBack) {
+      onBack();
+    } else {
+      handleGoHome();
+    }
+  };
+
   const handleLaunch = () => {
     soundFx.playClick();
     if (game.officialUrl) { window.open(game.officialUrl, '_blank', 'noopener,noreferrer'); return; }
@@ -69,9 +79,22 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-4xl rounded-2xl bg-[#080C1B] border border-cyan-400/50 shadow-[0_0_60px_rgba(0,240,255,0.25)] overflow-hidden">
-        {/* Header Bar with GO HOME button */}
+        {/* Header Bar with BACK and GO HOME buttons */}
         <div className="px-4 sm:px-6 py-3.5 bg-[#050713] border-b border-white/10 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
+            {/* BACK button */}
+            <button
+              type="button"
+              onClick={handleBack}
+              onMouseEnter={() => soundFx.playHover()}
+              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 hover:border-cyan-400/50 text-slate-300 hover:text-white font-gaming text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 shrink-0"
+              title="Return to previous page"
+              aria-label="Back to previous page"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+              <span>BACK</span>
+            </button>
+
             {/* GO HOME button */}
             <button
               type="button"
@@ -90,7 +113,7 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
 
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#00F0FF] shrink-0" />
-              <span className="font-gaming text-xs font-bold uppercase tracking-wider text-white truncate max-w-[170px] sm:max-w-xs md:max-w-md">
+              <span className="font-gaming text-xs font-bold uppercase tracking-wider text-white truncate max-w-[140px] sm:max-w-xs md:max-w-md">
                 PLAY ARENA LAUNCHER // {game.title}
               </span>
             </div>

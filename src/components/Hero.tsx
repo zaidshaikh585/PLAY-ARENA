@@ -557,7 +557,7 @@ export const Hero: React.FC<HeroProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <Flame className="w-4 h-4 text-pink-400" />
-                <span>$250K+ Active Pools</span>
+                <span>₹2.5Cr+ Active Pools</span>
               </div>
             </div>
           </div>

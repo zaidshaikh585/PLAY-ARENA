@@ -178,15 +178,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigateHome }) => {
     void loadAdminData();
   }, []);
 
-  const handleSignOut = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+  const handleBackToWebsite = () => {
+    soundFx.playClick();
     if (onNavigateHome) {
       onNavigateHome();
     } else {
       window.location.assign('/');
     }
+  };
+
+  const handleSignOut = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    handleBackToWebsite();
   };
 
   // Status Updater for Reports
@@ -300,10 +305,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigateHome }) => {
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => {
-              if (onNavigateHome) onNavigateHome();
-              else window.location.assign('/');
-            }}
+            onClick={handleBackToWebsite}
             className="rounded-xl px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-gaming font-bold flex items-center gap-2 transition-all text-slate-300 hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -406,10 +408,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigateHome }) => {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (onNavigateHome) onNavigateHome();
-                  else window.location.assign('/');
-                }}
+                onClick={handleBackToWebsite}
                 className="px-5 py-2.5 rounded-xl bg-white/5 text-slate-400 font-gaming text-xs font-bold uppercase hover:bg-white/10 hover:text-white transition-all"
               >
                 Go to Public Website

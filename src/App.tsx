@@ -323,7 +323,7 @@ export default function App() {
   const handlePlayGame = (game: Game) => {
     setSelectedGameForLaunch(game);
     if (typeof window !== 'undefined' && window.history?.pushState) {
-      window.history.pushState({}, '', '/play');
+      window.history.pushState({ fromHome: true }, '', '/play');
     }
   };
 
@@ -331,7 +331,7 @@ export default function App() {
     setSelectedGameForLaunch(null);
     if (typeof window !== 'undefined') {
       if (window.history?.pushState) {
-        window.history.pushState({}, '', '/');
+        window.history.pushState({ fromHome: true }, '', '/');
       }
       const hero = document.querySelector('#home');
       if (hero) {
@@ -342,11 +342,39 @@ export default function App() {
     }
   };
 
+  const handleBackFromLauncher = () => {
+    if (typeof window !== 'undefined') {
+      const hasHistory = window.history.length > 1;
+      const prevWasAdmin = window.history.state?.fromAdmin || (document.referrer && document.referrer.includes('/admin'));
+
+      if (hasHistory && !prevWasAdmin && window.location.pathname.startsWith('/play')) {
+        window.history.back();
+      } else {
+        handleNavigateHomeFromLauncher();
+      }
+    } else {
+      setSelectedGameForLaunch(null);
+    }
+  };
+
   const handleCloseLauncher = () => {
     setSelectedGameForLaunch(null);
     if (typeof window !== 'undefined' && window.history?.pushState && window.location.pathname.startsWith('/play')) {
-      window.history.pushState({}, '', '/');
+      window.history.pushState({ fromHome: true }, '', '/');
     }
+  };
+
+  const handleNavigateHomeFromAdmin = () => {
+    if (typeof window !== 'undefined') {
+      if (window.history?.replaceState) {
+        window.history.replaceState({ fromHome: true }, '', '/');
+      } else {
+        window.location.assign('/');
+      }
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    setIsAdminRoute(false);
+    setSelectedGameForLaunch(null);
   };
 
   const handleSelectGameById = (gameId: string) => {
@@ -387,10 +415,7 @@ export default function App() {
     setCurrentUser(null);
     showToast('Neural link terminated. Signed out of Play Arena.');
     if (isAdminRoute) {
-      setIsAdminRoute(false);
-      if (typeof window !== 'undefined' && window.history?.pushState) {
-        window.history.pushState({}, '', '/');
-      }
+      handleNavigateHomeFromAdmin();
     }
   };
 
@@ -410,10 +435,14 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
-      setIsAdminRoute(path.startsWith('/admin'));
-      if (path.startsWith('/play')) {
+      if (path.startsWith('/admin')) {
+        setIsAdminRoute(true);
+        setSelectedGameForLaunch(null);
+      } else if (path.startsWith('/play')) {
+        setIsAdminRoute(false);
         setSelectedGameForLaunch((prev) => prev || gamesList[0] || FEATURED_GAMES[0]);
-      } else if (!path.startsWith('/admin')) {
+      } else {
+        setIsAdminRoute(false);
         setSelectedGameForLaunch(null);
       }
     };
@@ -426,14 +455,12 @@ export default function App() {
   // If user navigates to /admin, render the full AdminPanel
   if (isAdminRoute) {
     return (
-      <AdminPanel
-        onNavigateHome={() => {
-          setIsAdminRoute(false);
-          if (typeof window !== 'undefined' && window.history?.pushState) {
-            window.history.pushState({}, '', '/');
-          }
-        }}
-      />
+      <div className="relative min-h-screen bg-[#05070E] text-slate-100 overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200">
+        <CustomCursor />
+        <AdminPanel
+          onNavigateHome={handleNavigateHomeFromAdmin}
+        />
+      </div>
     );
   }
 
@@ -461,7 +488,7 @@ export default function App() {
         onOpenAdmin={() => {
           setIsAdminRoute(true);
           if (typeof window !== 'undefined' && window.history?.pushState) {
-            window.history.pushState({}, '', '/admin');
+            window.history.pushState({ fromAdmin: true }, '', '/admin');
           }
         }}
       />
@@ -529,6 +556,7 @@ export default function App() {
         game={selectedGameForLaunch}
         onClose={handleCloseLauncher}
         onNavigateHome={handleNavigateHomeFromLauncher}
+        onBack={handleBackFromLauncher}
       />
 
       <SearchModal
