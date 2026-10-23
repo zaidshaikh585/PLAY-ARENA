@@ -26,6 +26,7 @@ import {
   Flame,
   Activity,
   Calendar,
+  Award,
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { FEATURED_GAMES } from '../data/gamingData';
@@ -69,6 +70,76 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigateHome }) => {
   } | null>(null);
 
   const [selectedUserDetail, setSelectedUserDetail] = useState<UserProfile | null>(null);
+
+  const [editingUserStats, setEditingUserStats] = useState<UserProfile | null>(null);
+  const [statsForm, setStatsForm] = useState<{
+    gamer_tag: string;
+    wins: string;
+    xp: string;
+    level: string;
+    win_rate: string;
+    primary_game: string;
+    badge: string;
+  }>({
+    gamer_tag: '',
+    wins: '',
+    xp: '',
+    level: '',
+    win_rate: '',
+    primary_game: '',
+    badge: '',
+  });
+
+  const handleOpenEditStats = (u: UserProfile) => {
+    setEditingUserStats(u);
+    setStatsForm({
+      gamer_tag: u.gamer_tag || '',
+      wins: u.wins !== null && u.wins !== undefined ? String(u.wins) : '',
+      xp: u.xp !== null && u.xp !== undefined ? String(u.xp) : '',
+      level: u.level !== null && u.level !== undefined ? String(u.level) : '',
+      win_rate: u.win_rate || '',
+      primary_game: u.primary_game || '',
+      badge: u.badge || '',
+    });
+  };
+
+  const handleSaveStats = async () => {
+    if (!editingUserStats || !supabase) return;
+    try {
+      const payload: any = {
+        gamer_tag: statsForm.gamer_tag.trim() || null,
+        wins: statsForm.wins.trim() ? parseInt(statsForm.wins.trim(), 10) : null,
+        xp: statsForm.xp.trim() ? parseInt(statsForm.xp.trim(), 10) : null,
+        level: statsForm.level.trim() ? parseInt(statsForm.level.trim(), 10) : null,
+        win_rate: statsForm.win_rate.trim() || null,
+        primary_game: statsForm.primary_game.trim() || null,
+        badge: statsForm.badge.trim() || null,
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', editingUserStats.id);
+
+      if (error) {
+        if (error.message.includes('does not exist')) {
+          throw new Error(
+            'Stats columns do not exist in database yet. Please execute supabase/leaderboard_migration.sql in your Supabase SQL Editor.'
+          );
+        }
+        throw error;
+      }
+
+      setProfiles((prev) =>
+        prev.map((u) => (u.id === editingUserStats.id ? { ...u, ...payload } : u))
+      );
+      showNotice(`Stats and profile updated for ${statsForm.gamer_tag || editingUserStats.email}`);
+      soundFx.playSuccess();
+      setEditingUserStats(null);
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'Failed to update user stats.');
+    }
+  };
 
   const showNotice = (msg: string) => {
     setActionNotice(msg);
@@ -710,6 +781,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigateHome }) => {
                                     <Eye className="w-3.5 h-3.5" />
                                   </button>
 
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditStats(u)}
+                                    className="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                    title="Edit Gamer Tag and Leaderboard Stats"
+                                  >
+                                    <Award className="w-3.5 h-3.5" />
+                                  </button>
+
                                   {u.role === 'user' ? (
                                     <button
                                       type="button"
@@ -1105,7 +1185,47 @@ UPDATE public.profiles
 SET role = 'admin'
 WHERE email = '${currentAdminEmail || 'your-registered-email@example.com'}';`}
                   </pre>
-                  <a
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="text-xs font-mono font-bold text-amber-300 uppercase mb-2">
+                      Leaderboard Public RPC Migration
+                    </div>
+                    <p className="text-xs text-slate-400 mb-2 font-mono">
+                      To publish real registered players to website visitors without exposing user emails, execute the migration script in <code>supabase/leaderboard_migration.sql</code>.
+                    </p>
+                    <pre className="p-3 rounded-xl bg-slate-950 border border-white/10 text-[11px] font-mono text-emerald-300 overflow-x-auto select-all">
+{`-- Run in Supabase SQL Editor:
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS wins integer DEFAULT null,
+  ADD COLUMN IF NOT EXISTS xp integer DEFAULT null,
+  ADD COLUMN IF NOT EXISTS level integer DEFAULT null,
+  ADD COLUMN IF NOT EXISTS win_rate text DEFAULT null,
+  ADD COLUMN IF NOT EXISTS primary_game text DEFAULT null,
+  ADD COLUMN IF NOT EXISTS badge text DEFAULT null,
+  ADD COLUMN IF NOT EXISTS avatar_color text DEFAULT null,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+CREATE OR REPLACE FUNCTION public.get_leaderboard_players()
+RETURNS TABLE (
+  id uuid, gamer_tag text, role text, created_at timestamptz,
+  wins integer, xp integer, level integer, win_rate text,
+  primary_game text, badge text, avatar_color text
+)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS \$\$
+BEGIN
+  RETURN QUERY
+  SELECT p.id,
+    COALESCE(NULLIF(TRIM(p.gamer_tag), ''), 'Gamer #' || SUBSTRING(p.id::text FROM 1 FOR 4)),
+    p.role, p.created_at, p.wins, p.xp, p.level, p.win_rate, p.primary_game, p.badge, p.avatar_color
+  FROM public.profiles p
+  ORDER BY COALESCE(p.wins, 0) DESC, COALESCE(p.xp, 0) DESC, p.created_at ASC;
+END; \$\$;
+
+REVOKE ALL ON FUNCTION public.get_leaderboard_players() FROM public;
+GRANT EXECUTE ON FUNCTION public.get_leaderboard_players() TO anon, authenticated;`}
+                    </pre>
+                  </div>
+
+                                    <a
                     href="https://supabase.com/dashboard"
                     target="_blank"
                     rel="noreferrer"
@@ -1195,6 +1315,48 @@ WHERE email = '${currentAdminEmail || 'your-registered-email@example.com'}';`}
               </div>
             </div>
 
+            {/* Competitive Stats Section */}
+            <div className="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/20 space-y-2 text-xs font-mono">
+              <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>LEADERBOARD COMPETITIVE STATS</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                <div>
+                  <span className="text-slate-500 block">LEVEL:</span>
+                  <span className="text-slate-200 font-bold">
+                    {selectedUserDetail.level !== null && selectedUserDetail.level !== undefined ? `LVL ${selectedUserDetail.level}` : 'Unranked'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">WINS:</span>
+                  <span className="text-slate-200 font-bold">
+                    {selectedUserDetail.wins !== null && selectedUserDetail.wins !== undefined ? selectedUserDetail.wins.toLocaleString() : 'No matches'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">XP:</span>
+                  <span className="text-cyan-300 font-bold">
+                    {selectedUserDetail.xp !== null && selectedUserDetail.xp !== undefined ? String(selectedUserDetail.xp) : '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">WIN RATE:</span>
+                  <span className="text-emerald-400 font-bold">{selectedUserDetail.win_rate || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">PRIMARY GAME:</span>
+                  <span className="text-slate-200">{selectedUserDetail.primary_game || 'Play Arena'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">BADGE:</span>
+                  <span className="text-amber-400 font-bold">
+                    {selectedUserDetail.badge || (selectedUserDetail.role === 'admin' ? 'Arena Admin' : 'Registered Gamer')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => setSelectedUserDetail(null)}
@@ -1202,6 +1364,134 @@ WHERE email = '${currentAdminEmail || 'your-registered-email@example.com'}';`}
             >
               Close Dossier
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Player Stats Editor Modal */}
+      {editingUserStats && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl bg-[#090D1E] border border-cyan-400/40 p-6 shadow-[0_0_50px_rgba(0,240,255,0.25)] relative space-y-4 max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setEditingUserStats(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-cyan-400/20 text-cyan-300 border border-cyan-400/40">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-gaming font-black text-lg text-white uppercase">
+                  EDIT PLAYER & LEADERBOARD STATS
+                </h3>
+                <p className="text-xs font-mono text-slate-400">
+                  {editingUserStats.email || editingUserStats.id}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2 text-xs font-mono">
+              <div>
+                <label className="block text-slate-400 mb-1">GAMER TAG</label>
+                <input
+                  type="text"
+                  value={statsForm.gamer_tag}
+                  onChange={(e) => setStatsForm({ ...statsForm, gamer_tag: e.target.value })}
+                  placeholder="e.g. PhoenixGamer"
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">TOTAL WINS</label>
+                  <input
+                    type="number"
+                    value={statsForm.wins}
+                    onChange={(e) => setStatsForm({ ...statsForm, wins: e.target.value })}
+                    placeholder="e.g. 150"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">LEVEL</label>
+                  <input
+                    type="number"
+                    value={statsForm.level}
+                    onChange={(e) => setStatsForm({ ...statsForm, level: e.target.value })}
+                    placeholder="e.g. 45"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">XP EARNED</label>
+                  <input
+                    type="number"
+                    value={statsForm.xp}
+                    onChange={(e) => setStatsForm({ ...statsForm, xp: e.target.value })}
+                    placeholder="e.g. 85000"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">WIN RATE</label>
+                  <input
+                    type="text"
+                    value={statsForm.win_rate}
+                    onChange={(e) => setStatsForm({ ...statsForm, win_rate: e.target.value })}
+                    placeholder="e.g. 72.4%"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 mb-1">PRIMARY GAME</label>
+                  <input
+                    type="text"
+                    value={statsForm.primary_game}
+                    onChange={(e) => setStatsForm({ ...statsForm, primary_game: e.target.value })}
+                    placeholder="e.g. VALORANT"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">BADGE / RANK TITLE</label>
+                  <input
+                    type="text"
+                    value={statsForm.badge}
+                    onChange={(e) => setStatsForm({ ...statsForm, badge: e.target.value })}
+                    placeholder="e.g. Apex Predator, Gladiator"
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-cyan-400 focus:outline-none text-white text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setEditingUserStats(null)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-gaming font-bold text-slate-300 uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveStats()}
+                className="px-5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-gaming font-black uppercase shadow-[0_0_15px_rgba(0,240,255,0.4)]"
+              >
+                Save Player Stats
+              </button>
+            </div>
           </div>
         </div>
       )}

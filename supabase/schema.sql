@@ -12,6 +12,13 @@ create table if not exists public.profiles (
   email text,
   gamer_tag text,
   role text not null default 'user' check (role in ('user', 'admin')),
+  wins integer default null,
+  xp integer default null,
+  level integer default null,
+  win_rate text default null,
+  primary_game text default null,
+  badge text default null,
+  avatar_color text default null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -141,6 +148,50 @@ $$;
 
 revoke all on function public.is_playarena_admin() from public;
 grant execute on function public.is_playarena_admin() to authenticated, anon;
+
+-- Helper: Fetch public leaderboard players securely without exposing user emails
+create or replace function public.get_leaderboard_players()
+returns table (
+  id uuid,
+  gamer_tag text,
+  role text,
+  created_at timestamptz,
+  wins integer,
+  xp integer,
+  level integer,
+  win_rate text,
+  primary_game text,
+  badge text,
+  avatar_color text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select
+    p.id,
+    coalesce(nullif(trim(p.gamer_tag), ''), 'Gamer #' || substring(p.id::text from 1 for 4)) as gamer_tag,
+    p.role,
+    p.created_at,
+    p.wins,
+    p.xp,
+    p.level,
+    p.win_rate,
+    p.primary_game,
+    p.badge,
+    p.avatar_color
+  from public.profiles p
+  order by
+    coalesce(p.wins, 0) desc,
+    coalesce(p.xp, 0) desc,
+    p.created_at asc;
+end;
+$$;
+
+revoke all on function public.get_leaderboard_players() from public;
+grant execute on function public.get_leaderboard_players() to anon, authenticated;
 
 -- Enable RLS on all tables
 alter table public.profiles enable row level security;

@@ -50,14 +50,18 @@ export interface Tournament {
 export interface PlayerRank {
   rank: number;
   handle: string;
-  realName: string;
+  realName?: string;
   avatarColor: string;
-  level: number;
-  wins: number;
-  xp: string;
-  winRate: string;
+  level: number | null;
+  wins: number | null;
+  xp: string | number | null;
+  winRate: string | null;
   primaryGame: string;
-  badge: 'Apex Predator' | 'Grandmaster' | 'Warlord' | 'Elite' | 'Challenger';
+  badge: 'Apex Predator' | 'Grandmaster' | 'Warlord' | 'Elite' | 'Challenger' | 'Arena Admin' | string;
+  userId?: string;
+  hasStats?: boolean;
+  createdAt?: string;
+  role?: string;
 }
 
 export interface NewsArticle {
@@ -78,6 +82,13 @@ export interface UserProfile {
   role: 'user' | 'admin';
   created_at: string;
   updated_at?: string;
+  wins?: number | null;
+  xp?: number | string | null;
+  level?: number | null;
+  win_rate?: string | null;
+  primary_game?: string | null;
+  badge?: string | null;
+  avatar_color?: string | null;
 }
 
 export interface ReportItem {
@@ -107,4 +118,3 @@ export interface NewsletterSubscriberRecord {
   email: string;
   created_at: string;
 }
-

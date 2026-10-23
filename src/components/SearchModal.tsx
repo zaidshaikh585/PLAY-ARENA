@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, X, Play, Trophy, Users, ArrowRight } from 'lucide-react';
-import { FEATURED_GAMES, UPCOMING_TOURNAMENTS, GAME_CATEGORIES, LEADERBOARD_PLAYERS } from '../data/gamingData';
+import { FEATURED_GAMES, UPCOMING_TOURNAMENTS, GAME_CATEGORIES } from '../data/gamingData';
 import { Game } from '../types/gaming';
 import { soundFx } from '../utils/soundEffects';
 

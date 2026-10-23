@@ -86,7 +86,7 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
           className="w-16 h-16 rounded-full mx-auto flex items-center justify-center font-bold text-xl text-slate-950 font-gaming mb-4 shadow-[0_0_20px_rgba(0,240,255,0.4)]"
           style={{ backgroundColor: player.avatarColor }}
         >
-          {player.handle.slice(0, 2)}
+          {player.handle.slice(0, 2).toUpperCase()}
         </div>
 
         <div className="text-xs font-mono text-cyan-400 uppercase tracking-widest">
@@ -96,24 +96,32 @@ export const PlayerModal: React.FC<PlayerModalProps> = ({ player, onClose }) => 
         <h3 className="font-gaming font-black text-2xl text-white uppercase mt-1">
           {player.handle}
         </h3>
-        <p className="text-slate-400 text-xs font-mono">{player.realName}</p>
+        <p className="text-slate-400 text-xs font-mono">{player.realName || 'Registered Member'}</p>
 
         <div className="my-6 p-4 rounded-xl bg-[#050814] border border-white/10 grid grid-cols-2 gap-4 text-xs font-mono text-left">
           <div>
             <span className="text-slate-500 block">PRIMARY GAME</span>
-            <span className="font-bold text-slate-200">{player.primaryGame}</span>
+            <span className="font-bold text-slate-200">{player.primaryGame || 'Play Arena'}</span>
           </div>
           <div>
             <span className="text-slate-500 block">LEVEL</span>
-            <span className="font-bold text-cyan-300 font-tabular">Level {player.level}</span>
+            <span className="font-bold text-cyan-300 font-tabular">
+              {player.level !== null && player.level !== undefined ? `Level ${player.level}` : 'Unranked'}
+            </span>
           </div>
           <div>
             <span className="text-slate-500 block">TOTAL WINS</span>
-            <span className="font-bold text-emerald-400 font-tabular">{player.wins}</span>
+            <span className="font-bold text-emerald-400 font-tabular">
+              {player.wins !== null && player.wins !== undefined ? player.wins.toLocaleString() : 'No matches'}
+            </span>
           </div>
           <div>
             <span className="text-slate-500 block">WIN RATE</span>
-            <span className="font-bold text-amber-400 font-tabular">{player.winRate}</span>
+            <span className="font-bold text-amber-400 font-tabular">{player.winRate || '—'}</span>
+          </div>
+          <div className="col-span-2 pt-2 border-t border-white/5 flex items-center justify-between">
+            <span className="text-slate-500">XP EARNED</span>
+            <span className="font-bold text-cyan-300 font-tabular">{player.xp || '—'}</span>
           </div>
         </div>
 

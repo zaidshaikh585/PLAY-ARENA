@@ -244,68 +244,9 @@ export const UPCOMING_TOURNAMENTS: Tournament[] = [
   },
 ];
 
-export const LEADERBOARD_PLAYERS: PlayerRank[] = [
-  {
-    rank: 1,
-    handle: 'ShadowX',
-    realName: 'Alex Mercer',
-    avatarColor: '#F59E0B',
-    level: 98,
-    wins: 1420,
-    xp: '842,500',
-    winRate: '78.4%',
-    primaryGame: 'Cyber Strike',
-    badge: 'Apex Predator',
-  },
-  {
-    rank: 2,
-    handle: 'Viper',
-    realName: 'Elena Rostova',
-    avatarColor: '#94A3B8',
-    level: 94,
-    wins: 1290,
-    xp: '789,100',
-    winRate: '74.2%',
-    primaryGame: 'Shadow Protocol',
-    badge: 'Grandmaster',
-  },
-  {
-    rank: 3,
-    handle: 'Nova',
-    realName: 'Marcus Chen',
-    avatarColor: '#D97706',
-    level: 91,
-    wins: 1185,
-    xp: '742,000',
-    winRate: '71.8%',
-    primaryGame: 'Apex Warriors',
-    badge: 'Warlord',
-  },
-  {
-    rank: 4,
-    handle: 'Ghost',
-    realName: 'Liam Vance',
-    avatarColor: '#38BDF8',
-    level: 88,
-    wins: 1040,
-    xp: '698,400',
-    winRate: '68.5%',
-    primaryGame: 'Cyber Strike',
-    badge: 'Elite',
-  },
-  {
-    rank: 5,
-    handle: 'Raven',
-    realName: 'Sophia Vane',
-    avatarColor: '#EC4899',
-    level: 86,
-    wins: 975,
-    xp: '654,200',
-    winRate: '66.9%',
-    primaryGame: 'Neon Drift',
-    badge: 'Challenger',
-  },
-];
+// Real leaderboard players are loaded dynamically from Supabase database (public.profiles via get_leaderboard_players RPC).
+// No fictional or mock players are used.
+export const LEADERBOARD_PLAYERS: PlayerRank[] = [];
 
 export const COMMUNITY_CARDS = [
   {
