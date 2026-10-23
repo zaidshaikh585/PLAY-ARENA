@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : ({} as Record<string, string | undefined>);
+
+const rawUrl = (env.VITE_SUPABASE_URL as string | undefined)?.trim();
+const key = (env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 
 const sanitizeUrl = (u?: string): string => {
   if (!u) return '';
@@ -67,8 +69,8 @@ export function getAuthRedirectUrl(path: string = '/'): string {
   let origin = '';
 
   const envUrl = (
-    (import.meta.env.VITE_SITE_URL as string | undefined) ||
-    (import.meta.env.VITE_APP_URL as string | undefined)
+    (env.VITE_SITE_URL as string | undefined) ||
+    (env.VITE_APP_URL as string | undefined)
   )?.trim();
 
   if (envUrl && /^https?:\/\//i.test(envUrl)) {
@@ -83,7 +85,7 @@ export function getAuthRedirectUrl(path: string = '/'): string {
   console.log('[PlayArena Auth] Generated auth redirect URL:', {
     origin,
     fullUrl,
-    environment: import.meta.env.MODE,
+    environment: env.MODE || 'production',
   });
 
   return fullUrl;

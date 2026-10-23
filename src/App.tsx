@@ -357,7 +357,10 @@ export default function App() {
     setCurrentUser(null);
     showToast('Neural link terminated. Signed out of Play Arena.');
     if (isAdminRoute) {
-      window.location.assign('/');
+      setIsAdminRoute(false);
+      if (typeof window !== 'undefined' && window.history?.pushState) {
+        window.history.pushState({}, '', '/');
+      }
     }
   };
 
@@ -373,11 +376,29 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Listen for browser popstate (back / forward navigation)
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsAdminRoute(window.location.pathname.startsWith('/admin'));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const wishlistedGames = gamesList.filter((g) => wishlistIds.includes(g.id));
 
   // If user navigates to /admin, render the full AdminPanel
   if (isAdminRoute) {
-    return <AdminPanel />;
+    return (
+      <AdminPanel
+        onNavigateHome={() => {
+          setIsAdminRoute(false);
+          if (typeof window !== 'undefined' && window.history?.pushState) {
+            window.history.pushState({}, '', '/');
+          }
+        }}
+      />
+    );
   }
 
   return (
@@ -401,7 +422,12 @@ export default function App() {
         wishlistCount={wishlistIds.length}
         currentUser={currentUser}
         onSignOut={handleSignOut}
-        onOpenAdmin={() => window.location.assign('/admin')}
+        onOpenAdmin={() => {
+          setIsAdminRoute(true);
+          if (typeof window !== 'undefined' && window.history?.pushState) {
+            window.history.pushState({}, '', '/admin');
+          }
+        }}
       />
 
       {/* Main Content Sections */}

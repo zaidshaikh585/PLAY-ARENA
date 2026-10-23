@@ -33,7 +33,11 @@ import { Game, UserProfile, ReportItem, TournamentRegistrationRecord, Newsletter
 import { soundFx } from '../utils/soundEffects';
 import { AuthModal } from './AuthModal';
 
-export const AdminPanel: React.FC = () => {
+interface AdminPanelProps {
+  onNavigateHome?: () => void;
+}
+
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigateHome }) => {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
   const [currentAdminEmail, setCurrentAdminEmail] = useState<string | null>(null);
@@ -178,7 +182,11 @@ export const AdminPanel: React.FC = () => {
     if (supabase) {
       await supabase.auth.signOut();
     }
-    window.location.assign('/');
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else {
+      window.location.assign('/');
+    }
   };
 
   // Status Updater for Reports
@@ -292,7 +300,10 @@ export const AdminPanel: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => window.location.assign('/')}
+            onClick={() => {
+              if (onNavigateHome) onNavigateHome();
+              else window.location.assign('/');
+            }}
             className="rounded-xl px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-gaming font-bold flex items-center gap-2 transition-all text-slate-300 hover:text-white"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -395,7 +406,10 @@ export const AdminPanel: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => window.location.assign('/')}
+                onClick={() => {
+                  if (onNavigateHome) onNavigateHome();
+                  else window.location.assign('/');
+                }}
                 className="px-5 py-2.5 rounded-xl bg-white/5 text-slate-400 font-gaming text-xs font-bold uppercase hover:bg-white/10 hover:text-white transition-all"
               >
                 Go to Public Website
