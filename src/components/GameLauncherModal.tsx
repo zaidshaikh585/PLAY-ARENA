@@ -32,7 +32,7 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
       onClose();
       if (typeof window !== 'undefined') {
         if (window.history?.pushState) {
-          window.history.pushState({}, '', '/');
+          window.history.pushState({ fromHome: true }, '', '/');
         }
         const hero = document.querySelector('#home');
         if (hero) {
@@ -45,12 +45,8 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
   };
 
   const handleBack = () => {
-    soundFx.playClick();
-    if (onBack) {
-      onBack();
-    } else {
-      handleGoHome();
-    }
+    // Navigate safely and directly to home, strictly avoiding browser history or /admin
+    handleGoHome();
   };
 
   const handleLaunch = () => {
@@ -79,34 +75,21 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-4xl rounded-2xl bg-[#080C1B] border border-cyan-400/50 shadow-[0_0_60px_rgba(0,240,255,0.25)] overflow-hidden">
-        {/* Header Bar with BACK and GO HOME buttons */}
+        {/* Header Bar with BACK TO HOME button */}
         <div className="px-4 sm:px-6 py-3.5 bg-[#050713] border-b border-white/10 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap min-w-0">
-            {/* BACK button */}
-            <button
-              type="button"
-              onClick={handleBack}
-              onMouseEnter={() => soundFx.playHover()}
-              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 hover:border-cyan-400/50 text-slate-300 hover:text-white font-gaming text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 shrink-0"
-              title="Return to previous page"
-              aria-label="Back to previous page"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-              <span>BACK</span>
-            </button>
-
-            {/* GO HOME button */}
+            {/* BACK TO HOME button */}
             <button
               type="button"
               data-cursor="action"
               onClick={handleGoHome}
               onMouseEnter={() => soundFx.playHover()}
-              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-950/80 to-purple-950/80 hover:from-cyan-900/90 hover:to-purple-900/90 border border-cyan-400/50 hover:border-cyan-300 text-cyan-300 hover:text-white font-gaming text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(0,240,255,0.25)] hover:shadow-[0_0_25px_rgba(0,240,255,0.5)] transition-all duration-200 active:scale-95 shrink-0"
-              title="Return to main homepage"
-              aria-label="Go to homepage"
+              className="group relative flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-950/90 to-purple-950/90 hover:from-cyan-900/90 hover:to-purple-900/90 border border-cyan-400/50 hover:border-cyan-300 text-cyan-300 hover:text-white font-gaming text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(0,240,255,0.25)] hover:shadow-[0_0_25px_rgba(0,240,255,0.5)] transition-all duration-200 active:scale-95 shrink-0"
+              title="Return directly to homepage (/)"
+              aria-label="Back to Home"
             >
-              <Home className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
-              <span>GO HOME</span>
+              <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
+              <span>← BACK TO HOME</span>
             </button>
 
             <div className="h-4 w-px bg-white/15 hidden sm:block shrink-0" />
@@ -135,6 +118,25 @@ export const GameLauncherModal: React.FC<GameLauncherModalProps> = ({ game, onCl
 
         {/* Modal Body */}
         <div className="p-6 sm:p-8 space-y-6">
+          {/* Prominent Back to Home navigation bar directly above the main game card */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <button
+              type="button"
+              data-cursor="action"
+              onClick={handleGoHome}
+              onMouseEnter={() => soundFx.playHover()}
+              className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-950/80 via-[#0B132B] to-purple-950/80 hover:from-cyan-900/90 hover:to-purple-900/90 border border-cyan-400/50 hover:border-cyan-300 text-cyan-300 hover:text-white font-gaming text-xs sm:text-sm font-bold uppercase tracking-wider shadow-[0_0_20px_rgba(0,240,255,0.2)] hover:shadow-[0_0_30px_rgba(0,240,255,0.45)] transition-all duration-200 active:scale-95"
+              title="Return directly to homepage (/)"
+              aria-label="Back to Home"
+            >
+              <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
+              <span>← BACK TO HOME</span>
+            </button>
+            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+              OFFICIAL GAME CARD // {game.title}
+            </span>
+          </div>
+
           {/* Main Visual Display */}
           <div className="relative aspect-[16/9] rounded-xl overflow-hidden bg-slate-950 border border-white/10 group">
             <GameArtwork

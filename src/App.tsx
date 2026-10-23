@@ -343,18 +343,8 @@ export default function App() {
   };
 
   const handleBackFromLauncher = () => {
-    if (typeof window !== 'undefined') {
-      const hasHistory = window.history.length > 1;
-      const prevWasAdmin = window.history.state?.fromAdmin || (document.referrer && document.referrer.includes('/admin'));
-
-      if (hasHistory && !prevWasAdmin && window.location.pathname.startsWith('/play')) {
-        window.history.back();
-      } else {
-        handleNavigateHomeFromLauncher();
-      }
-    } else {
-      setSelectedGameForLaunch(null);
-    }
+    // Directly navigate to home route without relying on browser history or history.back()
+    handleNavigateHomeFromLauncher();
   };
 
   const handleCloseLauncher = () => {
